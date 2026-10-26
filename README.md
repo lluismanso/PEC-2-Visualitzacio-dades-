@@ -22,9 +22,9 @@ Per elaborar-les, s’han seleccionat conjunts de dades obertes adequats a les c
 |---|---|
 | PAC2_Visualitzacio_dades_Lluis_Manso.rmd | Codi font R Markdown amb tot el procés de creacions de les visualitzacions | 
 | PAC2_Visualitzacio_dades_Lluis_Manso.html | Informe exportat amb els codi i visualitzacions | 
-| annual_co2_emissions | Dataset amb les emissions totals anuals de CO2 per país del any 2024 | 
-| champions_league_matches | Dataset dels partits UEFA Champions League de la temporada 2025 2026 | 
-| per_capita_energy_source | Dataset del consum energètic per capita de la UE 27 | 
+| annual_co2_emissions.csv | Dataset amb les emissions totals anuals de CO2 per país del any 2024 | 
+| champions_league_matches.csv | Dataset dels partits UEFA Champions League de la temporada 2025 2026 | 
+| per_capita_energy_source.csv | Dataset del consum energètic per capita de la UE 27 | 
 
 # Requisits 
 El codi R requereix els paquets següents:
