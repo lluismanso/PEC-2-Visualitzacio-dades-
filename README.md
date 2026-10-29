@@ -6,7 +6,7 @@
 **Visualitzacions**: Cartogram, Linear dendrogram, UpSet: Visualizing  Intersecting Sets
 
 # Visualitzacions publicades
-Les tres visualitzacions elaborades per a aquesta pràctica es poden consultar al següent enllaç: https://lluismanso.github.io/PEC-2-Visualitzacio-dades-/
+Les tres visualitzacions elaborades per a aquesta pràctica es poden consultar en cadascun dels apartats de visualització del següent enllaç en: https://lluismanso.github.io/PEC-2-Visualitzacio-dades-/
 
 # Descripció
 En aquesta pràctica s’ha creat tres visualitzacions, usant les següents tècniques assignades: Cartograms, Linear dendrogram i UpSet: Visualizing. 
