@@ -1,0 +1,430 @@
+---
+title: 'PAC 2: Visualització de Dades'
+author: "Lluís Manso Matachana"
+date: "2026-10-19"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(cartogram)
+library(rnaturalearth)
+library(tidyr)
+library(stringr)
+library(dendextend)
+library(ComplexUpset)
+```
+
+# Introducció 
+
+En aquesta pràctica s’ha creat tres visualitzacions, usant les següents tècniques assignades: Cartograms, Linear dendrogram i UpSet: Visualizing. 
+
+Per elaborar-les, s’han seleccionat conjunts de dades obertes adequats a les característiques de cada tècnica.
+
+En el cartogram, s´ha treballat amb dades obertes d’Our World in Data sobre les emissions totals de CO2 per país l’any 2024, amb l’objectiu de representar visualment les diferències entre els principals emissors mundials.
+
+En el linear dendogram, s’han utilitzat dades obertes de Kaggle sobre els partits de la temporada 2025-2026 de la UEFA Champions League, amb l’objectiu d’identificar similituds entre els partits a partir de les seves estadístiques numèriques.
+
+En el upset:visualizing, s’han utilitzat dades d’Our World in Data sobre el consum d’energia per capita segons la font energètica als països de la Unió Europea l’any 2025, amb l’objectiu d’identificar patrons i interseccions entre les diferents fonts d’energia.
+
+# TÈCNICA GRUP I (Bàsiques y populars): Cartograms
+
+## Definició
+
+Tal i com esmenta DataVizProject (https://datavizproject.com/data-type/cartogram/), el cartograma forma part de la familia geospacial, on es distorsiona la forma de les regions geogràfiques per tal de mostrar que l´àrea representa un conjunt de dades o variable.
+
+La seva funcionalitat és comparativa o de geolocalització i la seva representació gràfica es pot fer en cercles, quadrats o mapes que distorsionen el mapa original. 
+
+Les aplicacions més habituals dels cartogrames inclouen dades relacionades amb països, regions o estats com:
+- visualitzacions demogràfiques
+- representacions electorals
+- indicadors socieconomics
+
+## Tipus de dades i limitacions
+
+Aquest tipus de visualitzacions requereix informació geogràfica associada als territoris i una variable quantitativa que permeti determinar la distorsió de les seves àrees.
+
+Per això aquesta pràctica, s´ha decidit fer una tria d´un indicador ambiental quantitatiu com les emissions annuals de CO2 en un context geogràfic, amb l'objectiu de representar visualment les diferències entre els principals emissors mundials.
+
+En aquesta pràctica, cada observació correspon a un país o territori, identificat pel nom i el codi geogràfic, i la variable quantitativa és el total anual d'emissions de CO2 el 2024. 
+
+Això ha permes relacionar la dimensió geogràfica amb la magnitud de les emissions, de manera que els territoris amb valors més elevats adquireixen més pes visual.
+
+Tanmateix, pot presentar algunes limitacions. Quan existeixen diferències molt grans entre els valors, els territoris amb emissions baixes s´han vist reduïts i poden ser més difícils d'identificar. A més, la deformació de les formes geogràfiques ha dificultat en algunes ocasions el reconeixement dels països i la interpretació de les seves posicions relatives. 
+
+Per extreure aquestes dades, s´ha treballat amb la següent font: https://ourworldindata.org/co2-emissions. 
+
+El conjunt de dades utilitzat s´ha extret en format csv, i com abans esmentat correspon a l'any 2024 amb un nombre total de 197 observacions. 
+
+El csv contè les següents variables:
+
+- Entity: variable categòrica que identifica el país.
+
+- Code: variable categòrica que identifica el codi del país.
+
+- Year: variable numèrica que identifica l'any de les dades (2024).
+
+- Annual CO2 emissions: variable numèrica que representa les emissions totals anuals de CO2 del país.
+
+Per qüestions de disseny, s´ha decidit excloure l´Antàrtida, amb un valor de 0, per concentrar-se en totes aquells països o territoris i els seus valors corresponents. 
+
+Aquesta visualització s'adreça a un públic general interessat en el canvi climàtic i en les desigualtats territorials de les emissions.
+
+## Implementació
+```{r}
+# Càrrega del csv
+co2_annual_emissions <- read.csv("annual_co2_emissions.csv")
+```
+
+```{r}
+# Reanomena la variable d´emssions CO2
+co2_annual_emissions <- co2_annual_emissions %>%
+  rename(co2_emissions = Annual.CO..emissions)
+
+# Càrrega el mapa mundi
+world <- ne_countries(
+  scale = "medium",
+  returnclass = "sf"
+)
+```
+
+```{r}
+# Associa codi amb la variable d´emissions CO2
+world_co2 <- world %>%
+  left_join(
+    co2_annual_emissions,
+    by = c("adm0_a3" = "Code")
+  )
+
+# Transforma el sistema de coordenades
+world_co2 <- st_transform(world_co2, 8857)
+
+# S´exclou dades que no estant disponibles i l´Antàrtida
+world_co2 <- world_co2 %>%
+  filter(!is.na(co2_emissions), iso_a3 != "ATA")
+
+# Creació del cartograma
+world_cartogram <- cartogram_cont(
+  world_co2,
+  weight = "co2_emissions",
+  itermax = 5
+)
+```
+
+## Visualització
+```{r}
+# Representació del cartograma amb la llibreria ggplot
+ggplot(world_cartogram) +
+  geom_sf(aes(fill = co2_emissions),
+          color = "white",
+          linewidth = 0.2) +
+  scale_fill_viridis_c(
+    trans = "sqrt",
+    name = "Emissions de CO2"
+  ) +
+  labs(
+    title = "Emissions globals de CO2 per país",
+    subtitle = "2024",
+    caption = "Font: Our World in Data - CO2 emissions"
+  ) +
+  theme_void()
+```
+
+## Anàlisi
+Observant el cartograma, tant les distorsions de la superfície geogràfica dels països com els colors de la llegenda permeten identificar diferències importants en les emissions totals de CO2 entre països.
+
+1. La Xina destaca com el país amb més emissions totals de CO2, ja que presenta una superfície considerablement ampliada respecte de la seva extensió geogràfica original i un color groc, corresponent als valors més elevats de l'escala cromàtica.
+
+2. L'Índia, els Estats Units i Rússia també destaquen per les seves emissions totals elevades, amb superfícies ampliades i colors que reflecteixen valors importants en comparació amb molts altres països.
+
+3. A Europa s'observen diferències entre països. Alemanya, França, Itàlia, Espanya, el Regne Unit i Polònia presenten una contribució significativa a les emissions totals de CO2, mentre que diversos països escandinaus i d'Europa de l'Est mostren valors diferents.
+
+4. Alguns països productors de petroli i gas, com l'Iran, Algèria i l'Aràbia Saudita, també presenten emissions totals destacables. 
+
+5. Diversos països de l'Àfrica central i subsahariana, així com Groenlàndia, presenten emissions totals de CO2 relativament baixes, fet que es reflecteix en la seva menor superfície al cartograma i en els colors corresponents als valors més reduïts.
+
+# TÈCNICA GRUP II (Habituals i específiques): Linear dendrogram
+
+## Definició 
+
+Tal i com esmenta DataVizProject (https://datavizproject.com/data-type/dendrogram/) el dendograma forma part de la familia de diagrames, consistin en un diagrama d´arbre amb l´objectiu d´il.lustrar els clusters produïts per les relacions jeràrquiques. 
+
+La seva funció principal és mostrar visualment el grau de semblança o dissimilaritat entre les observacions mitjançant branques que es van agrupant progressivament. En funció del mètode utilitzat, la longitud o l'alçada de les branques representa la distància a la qual s'uneixen les observacions o els grups. 
+
+Els dendogrames son freqüentment utilitzat en biologia computacional per mostrar els diferents clusters genètics o mostres. 
+
+## Tipus de dades i limitacions
+
+Aquest tipus de visualització permet agrupar observacions a partir de variables quantitatives i representar-ne les semblances mitjançant una estructura jeràrquica. El resultat depèn de les variables seleccionades i del mètode de càlcul de distàncies i agrupament utilitzat.
+
+Per aquesta tècnica s´ha treballat amb la següent font: https://www.kaggle.com/datasets/johntocci/champions-league-matches-2025-2026
+
+El conjunt de dades utilitzat s´ha extret en format csv, i correspon a la temporada 2025/2026 amb un nombre total de 151 observacions i 17 variables.
+
+Per construir el dendrograma i per qüestions de disseny visual, s'han transformat les dades originals per obtenir una observació per equip i calcular-ne les estadístiques mitjanes, independentment de si jugava com a local o visitant. Les variables utilitzades per establir les agrupacions són:
+
+- gols_marcats: mitjana de gols marcats per partit.
+
+- gols_rebuts: mitjana de gols encaixats per partit.
+
+- possessio: mitjana del percentatge de possessió.
+
+- precisio_xuts: mitjana del percentatge de xuts a porteria.
+
+- parades: mitjana de parades del porter per partit.
+
+Abans de calcular les distàncies, les variables numèriques s'han estandarditzat per facilitar-ne la comparació, i s'ha aplicat un mètode d'agrupament jeràrquic Ward.D2.
+
+Respecte les limitacions, aquest dendrograma no mostra directament totes les diferències entre els equips ni explica quines variables són responsables de cada agrupació. A més, quan augmenta el nombre d'observacions, les etiquetes i les branques poden acumular-se i dificultar la lectura tal i com es pot observar en la visualització. 
+
+En aquest estudi, l'ús de mitjanes permet resumir el rendiment de cada equip, però també elimina part de la variabilitat entre partits. Per aprofundir en les diferències, es podrien complementar els resultats amb una taula de les estadístiques mitjanes per equip. 
+
+Finalment, aquesta visualització es podria adreçar al gran públic interessat en el futbol, als professionals del periodisme esportiu i a les direccions esportives dels clubs, ja que permet identificar quins equips presenten perfils estadístics semblants durant la temporada 2025/2026. Aquesta informació pot servir com a punt de partida per comparar estils de joc i explorar possibles àrees de millora del rendiment esportiu. 
+
+## Implementació 
+
+```{r}
+champions_league <- read.csv("champions_league_matches.csv")
+```
+
+```{r}
+# Extreu els gols del marcador (score)
+champions_preparada <- champions_league %>%
+  separate(
+    score,
+    into = c("home_goals", "away_goals"),
+    sep = "\u2013",
+    convert = TRUE
+  ) %>%
+  mutate(
+    home_possession = as.numeric(
+      str_remove(home_possession, "%")
+    ),
+    away_possession = as.numeric(
+      str_remove(away_possession, "%")
+    ),
+    home_saves = as.numeric(
+      str_extract(home_saves, "^\\d+")
+    ),
+    away_saves = as.numeric(
+      str_extract(away_saves, "^\\d+")
+    )
+  )
+
+# Crea una observació per a cada equip
+equips_partits <- bind_rows(
+  champions_preparada %>%
+    transmute(
+      team = home_team,
+      goals_scored = home_goals,
+      goals_conceded = away_goals,
+      possession = home_possession,
+      shots_pct = home_shots_on_target_pct,
+      saves = home_saves
+    ),
+  champions_preparada %>%
+    transmute(
+      team = away_team,
+      goals_scored = away_goals,
+      goals_conceded = home_goals,
+      possession = away_possession,
+      shots_pct = away_shots_on_target_pct,
+      saves = away_saves
+    )
+)
+
+# Calcula les estadístiques mitjanes de cada equip
+perfils_equips <- equips_partits %>%
+  group_by(team) %>%
+  summarise(
+    partits = n(),
+    gols_marcats = mean(goals_scored, na.rm = TRUE),
+    gols_rebuts = mean(goals_conceded, na.rm = TRUE),
+    possessio = mean(possession, na.rm = TRUE),
+    precisio_xuts = mean(shots_pct, na.rm = TRUE),
+    parades = mean(saves, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Selecciona les variables esmentades per comparar els equips
+dades_equips <- perfils_equips %>%
+  select(
+    gols_marcats,
+    gols_rebuts,
+    possessio,
+    precisio_xuts,
+    parades
+  )
+
+# Conserva només els equips amb totes les dades
+files_completes <- complete.cases(dades_equips)
+
+dades_equips <- dades_equips[files_completes, ]
+
+etiquetes_equips <- perfils_equips$team[files_completes]
+
+# Estandarditza les variables
+dades_equips_est <- scale(dades_equips)
+
+# Calcula distàncies i clustering
+distancies_equips <- dist(dades_equips_est)
+
+clustering_equips <- hclust(
+  distancies_equips,
+  method = "ward.D2"
+)
+
+# Crea el dendrograma
+dend_equips <- as.dendrogram(clustering_equips)
+
+labels(dend_equips) <- etiquetes_equips
+
+dend_equips <- dend_equips %>%
+  set("labels_cex", 0.4)
+```
+
+## Visualització
+
+```{r}
+par(mar = c(5, 4, 4, 10), xpd = TRUE)
+
+plot(
+  dend_equips,
+  horiz = TRUE,
+  main = "Dendrograma lineal dels equips de la Champions League",
+  xlab = "Distància de dissimilaritat"
+)
+
+par(xpd = FALSE)
+```
+
+## Anàlisi
+Observant el dendrograma lineal, es poden identificar diverses agrupacions d'equips en funció de la similitud dels seus perfils estadístics durant la temporada 2025/2026.
+
+1. Agrupacions d'equips amb perfils semblants. Alguns equips s'uneixen a distàncies de dissimilaritat reduïdes, fet que indica que presenten perfils estadístics similars segons les variables analitzades. Per exemple, Villarreal i Union SG formen una agrupació propera, igual que Liverpool i Bayer Leverkusen. També s'observen agrupacions entre Barcelona i Atlético de Madrid, així com entre Arsenal i Ajax.
+
+2. Una altra de les principals observacions del dendrograma és la presència de dos grans grups d'equips, que s'uneixen a una distància de dissimilaritat aproximada de 5,5. 
+
+Grup superior: inclou equips com el Villarreal, Tottenham, Real Madrid, PSG, Napoli, Manchester City i Juventus, entre d'altres.
+
+Grup inferior: inclou equips com el Dortmund, Chelsea, Benfica, Bayern Munich, Barcelona, Atlético de Madrid, Arsenal i Ajax, entre d'altres.
+
+Aquesta separació suggereix l'existència de diferències globals entre els perfils estadístics dels equips de cada grup, tenint en compte les variables seleccionades. 
+
+Tot i això, per determinar quines característiques expliquen aquestes diferències, caldria complementar el dendrograma amb una comparació de les estadístiques mitjanes dels equips de cada grup.
+
+3. Per últim el dendograma, no és capac d´explicar el rendiment esportiu que han tingut cadascun dels equips de la Champions League, ja que hi ha equips tenen un grau alt de similaritat estadística però molt diferenciat del rendiement esportiu com Arsenal i Ajax. Arsenal va ser finalista de la Champions mentre que el Ajax va caure eliminat a la fase de grups. 
+
+# TÉCNICA GRUP III (Menos habituals o específiques): UpSet: Visualizing Intersecting Sets
+
+## Definició
+Tal i com esmenta National Center for Biotechnology Information (https://pmc.ncbi.nlm.nih.gov/articles/PMC4720993/), el Upset és una tècnica de visualització que representa les interseccions entre conjunts, mitjançant una matriu de punts i incorpora agregacions basades en agrupacions i consultes. Aquesta estructura permet representar de manera efectiva les interseccions entre conjunts, el nombre d'elements que contenen i altres estadístiques resum derivades dels atributs dels subconjunts o dels elements. A més, permet ordenar les interseccions segons diferents criteris per facilitar l'anàlisi i identificar les combinacions més rellevants.
+
+Les aplicacions més habituals dels UpSet inclouen camps amb grans volumens de dades multidimensionales: 
+- ordenar i filtrar dades
+- Seg
+- Biologia i genètica
+
+## Tipus de dades i limitacions
+La tècnica UpSet està dissenyada per representar les interseccions entre diversos conjunts. Les dades han de permetre identificar els elements que pertanyen a cada conjunt i determinar quines combinacions es produeixen.
+
+Per això aquesta pràctica, ha decidit analitzar les interseccions entre tres conjunts de països de la Unió Europea-27, definits segons si el seu consum d'energia per capita procedent de combustibles fòssils, energia nuclear o energies renovables supera la mediana corresponent. 
+
+L'objectiu és identificar les combinacions més freqüents i observar similituds en els perfils de consum energètic dels països analitzats.
+
+Per aquesta tècnica s´ha treballat amb la següent font: https://ourworldindata.org/energy-mix
+
+El conjunt de dades utilitzat s´ha extret en format csv, i correspon a l´any 2025 amb un nombre total de 26 observacions i 6 variables: 
+
+- Entity: variable categòrica que identifica el país.
+
+- Code: variable categòrica que identifica el codi del país.
+
+- Year: variable numèrica que identifica l'any de les dades (2025).
+
+- Fossil fuels: variable numèrica que identifica el consumer per càpita de combustibles fòssils.
+
+- Nuclear: variable numèrica que identifica el consumer per càpita d´energia nuclear.
+
+- Renewables: variable numèrica que identifica el consumer per càpita d´energies renovables.
+
+Aquest conjunt de dades de l´UE-27 ha presentat dues limitacions. La primera és que Malta no té informació disponible sobre el consum per càpita d´energia i per tant s´ha exclos de l´anàlisi. 
+
+La segona, es que s´ha observat que Xipre té un NA en la font d´energia de combustibles fòssils. Per respectar la coherencia i la comparabilitat amb els altres països s´ha pres la decisió de disseny de també excluir aquest païs en l´anàlisi. 
+
+Una altra limitació de la tècnica UpSet és que, tot i mostrar el nombre d'elements que pertanyen a cada intersecció, no facilita necessàriament la identificació individual d'aquests elements. En aquest estudi, permet observar quants països comparteixen determinats perfils de consum energètic, però no identificar directament quins països formen cada grup. Per aquest motiu, seria convenient complementar la visualització amb una taula o un gràfic de barres que permeti identificar els països de cada intersecció i comparar-ne els valors de consum energètic.
+
+Finalment, aquesta visualització es podria adreçar als responsables de les polítiques energètiques de les institucions europees i als professionals de les empreses del sector energètic, ja que permet identificar quines combinacions de fonts d'energia caracteritzen els països de la Unió Europea en termes de consum per capita. Aquesta informació pot servir com inici comparatiu de perfils energètics entre països i orientar l'anàlisi de les polítiques de transició energètica.
+
+## Implementació 
+
+```{r}
+# Càrrega del dataset
+energymix_pcap <- read.csv("per_capita_energy_source.csv")
+
+energymix_pcap[!complete.cases(energymix_pcap), ]
+```
+
+```{r}
+# Excloure aquells països que no tenen dades disponibles com Xipre
+energy_clean <- energymix_pcap %>%
+  filter(complete.cases(Fossil.fuels, Nuclear, Renewables))
+
+# Calcula les medianes
+mediana_fossils <- median(energy_clean$Fossil.fuels)
+mediana_nuclear <- median(energy_clean$Nuclear)
+mediana_renewables <- median(energy_clean$Renewables)
+
+# Estableix interseccions
+energy_sets <- energy_clean %>%
+  mutate(
+    `Fossil fuels` = Fossil.fuels > mediana_fossils,
+    Nuclear = Nuclear > mediana_nuclear,
+    Renewables = Renewables > mediana_renewables
+  )
+```
+
+## Visualització
+
+```{r}
+# Creació del upset
+upset(
+  energy_sets,
+  intersect = c("Fossil fuels", "Nuclear", "Renewables"),
+  name = "Fonts d'energia",
+  base_annotations = list(
+    "Nombre de països" = intersection_size()
+  ),
+  width_ratio = 0.2
+) +
+  labs(
+    title = "Interseccions entre fonts d'energia per capita",
+    subtitle = "Països de la Unió Europea, 2025",
+    x = "Interseccions",
+    caption = "Font: Our World in Data. Els conjunts es defineixen amb la mediana de cada font."
+  ) +
+  theme(
+    axis.text.x = element_text(size = 7),
+    axis.title.x = element_text(size = 9)
+  )
+```
+
+## Anàlisi
+Observant la visualització UpSet, es pot apreciar que els països de la Unió Europea presenten diferents combinacions de consum energètic per capita en funció de si superen la mediana de cada font:
+
+1. Predomini de determinades combinacions. La intersecció més nombrosa correspon a 6 països que superen la mediana del consum per capita d'energia nuclear, però no les de renovables ni de combustibles fòssils. La segona combinació més nombrosa inclou 5 països que superen la mediana tant en renovables com en combustibles fòssils.
+
+2. Existeix coincidències entre fonts energètiques. El gràfic permet observar quines combinacions de fonts apareixen simultàniament per sobre de la mediana. Per exemple, 5 països superen la mediana tant en renovables com en combustibles fòssils, mentre que 2 la superen en les tres fonts.
+
+3. Diversitat dels perfils energètics. Les diferents combinacions mostren que els països no comparteixen un únic perfil de consum energètic, sinó que presenten diverses configuracions segons les fonts analitzades.
+
+4. La visualització presenta limitacions a l'hora d'interpretar els perfils energètics de cada país, ja que no mostra directament la identitat dels països que formen cada intersecció ni la magnitud dels seus consums. 
+
+Per tant, seria convenient complementar-la amb un gràfic de barres que permetés comparar els valors de consum per capita de les diferents fonts energètiques per país.
